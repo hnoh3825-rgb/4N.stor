@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>إدارة السيريالات</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{--bg:#fff;--fg:#111;--c:#f3f4f6;--b:#d1d5db;--a:#7c3aed}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1115;--fg:#eee;--c:#1a1d24;--b:#2c313c}}
+body{font-family:system-ui,Tahoma,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:16px;max-width:1000px;margin-inline:auto}
+input,button{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--b);background:var(--c);color:var(--fg)}
+button{cursor:pointer}button.p{background:var(--a);color:#fff;border-color:var(--a)}
+.r{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;align-items:center}
+.w{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.9rem}
+td,th{border-bottom:1px solid var(--b);padding:8px;text-align:right;white-space:nowrap}
+.t{padding:2px 8px;border-radius:99px;font-size:.8rem;background:var(--c)}
+#m{min-height:1.3em;color:#ef4444}
+</style></head><body>
+<h2>إدارة السيريالات</h2>
+<div id="lg"><div class="r"><input id="e" type="email" placeholder="إيميل المدير" dir="ltr"><input id="p" type="password" placeholder="كلمة المرور" dir="ltr"><button class="p" onclick="login()">دخول</button></div></div>
+<div id="ad" hidden>
+<div class="r"><b>توليد سيريالات:</b><input id="n" type="number" value="1" min="1" max="200" style="width:80px"><input id="d" type="number" value="30" min="1" style="width:80px"> يوم
+<button class="p" onclick="gen()">توليد</button><button onclick="load()">تحديث</button><button onclick="out()">خروج</button></div>
+<pre id="g" dir="ltr" style="user-select:all"></pre>
+<div class="w"><table><thead><tr><th>السيريال</th><th>الحالة</th><th>البريد</th><th>المدة</th><th>ينتهي</th><th>إجراءات</th></tr></thead><tbody id="tb"></tbody></table></div>
+</div>
+<div id="m"></div>
+<script>
+const sb=window.supabase.createClient('https://ucyiygtbgwzykwmdrjbx.supabase.co','sb_publishable_Vx0UsRgP6mXlZ7tNJBgpcQ_pcxG3UdU');
+const $=s=>document.querySelector(s),msg=t=>$('#m').textContent=t||'';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function login(){msg();const{error}=await sb.auth.signInWithPassword({email:$('#e').value.trim(),password:$('#p').value});if(error)return msg(error.message);start()}
+async function start(){const{data}=await sb.auth.getSession();if(!data.session)return;const r=await sb.rpc('is_admin');
+if(r.error||!r.data){await sb.auth.signOut();return msg('هذا الحساب ليس مديراً.')}$('#lg').hidden=true;$('#ad').hidden=false;load()}
+async function out(){await sb.auth.signOut();location.reload()}
+function st(l){if(l.disabled)return'معطّل';if(!l.email)return'متاح';return new Date(l.expires_at)<new Date()?'منتهٍ':'مستخدم'}
+async function load(){msg();const{data,error}=await sb.rpc('admin_list');if(error)return msg(error.message);
+$('#tb').innerHTML=data.map(l=>`<tr><td dir="ltr">${esc(l.key)}</td><td><span class="t">${st(l)}</span></td><td dir="ltr">${esc(l.email||'—')}</td><td>${l.days} يوم</td><td>${l.expires_at?new Date(l.expires_at).toLocaleDateString('en-GB'):'—'}</td>
+<td><button onclick="ext('${esc(l.key)}')">+30 يوم</button> <button onclick="dis('${esc(l.key)}',${!l.disabled})">${l.disabled?'تفعيل':'تعطيل'}</button></td></tr>`).join('')}
+async function gen(){msg();const{data,error}=await sb.rpc('admin_create',{p_count:+$('#n').value,p_days:+$('#d').value});if(error)return msg(error.message);$('#g').textContent=data.join('\n');load()}
+async function ext(k){const d=+prompt('كم يوم تضيف؟','30');if(!d)return;const{error}=await sb.rpc('admin_extend',{p_key:k,p_days:d});error?msg(error.message):load()}
+async function dis(k,o){const{error}=await sb.rpc('admin_set_disabled',{p_key:k,p_off:o});error?msg(error.message):load()}
+start();
+</script></body></html>
